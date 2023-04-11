@@ -1,0 +1,67 @@
+<!doctype html>
+<head>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.357.0.min.js"></script>
+<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+<script type="text/javascript">
+
+//Bucket Configurations
+
+var bucketName = "omerald-reports-1";
+var bucketRegion = "eu-north-1";
+var IdentityPoolId = "eu-north-1:fa303bc3-e03d-4415-8141-2f2313713719";
+
+ AWS.config.update({
+                region: bucketRegion,
+                credentials: new AWS.CognitoIdentityCredentials({
+                IdentityPoolId: IdentityPoolId
+                })
+            });
+
+            var s3 = new AWS.S3({
+                params: {Bucket: bucketName}
+        });
+</script>
+</head>
+<body>
+    <!-- A functional html code-->
+    <div>
+        <input type="file" id="fileUpload">
+    </div>
+
+    <div>
+    <button onclick="s3upload()">Submit</button>
+    </div>
+
+    <progress max=”100” value=”0”></progress>
+
+    <script type="text/javascript">
+
+      function s3upload() {  
+                var files = document.getElementById('fileUpload').files;
+                if (files) 
+                {
+                    var file = files[0];
+                    var date = new Date();
+                    var fileName = file.name;
+                    var filePath = fileName;
+                    var fileUrl = "https://" + bucketRegion + ".amazonaws.com/my-first-bucket/" +  filePath;
+            
+                    s3.upload({
+                                    Key: filePath,
+                                    Body: file,
+                                    ACL: 'public-read'
+                                },function(err, data) {
+                                    if(err) {
+                                        console.log("Error uploading file: ", err);
+                                        alert("Error uploading file. Please check the browser's console for more information.");
+                                    }else {
+                                        alert('Successfully Uploaded!');
+                                    }}).on('httpUploadProgress', function (progress) {
+                                        var uploaded = parseInt((progress.loaded * 100) / progress.total);
+                                        $("progress").attr('value', uploaded);
+                                    });
+                                }
+                            };
+        </script>
+    </body>
+</html>

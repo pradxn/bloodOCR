@@ -1,0 +1,158 @@
+Requirement:
+
+Programming part:
+User should be able to upload a PDF file to the front-end application.
+The front-end should send the PDF file to an S3 bucket for storage.
+The front-end should trigger a Lambda function when the PDF file has been successfully uploaded to S3.
+The Lambda function should use Amazon Textract to extract text from the PDF file.
+The Lambda function should return the extracted text as a JSON object to the front-end.
+The front-end should display the extracted text to the user in a readable format.
+
+Security part:
+The application should be able to handle multiple file uploads and extract text concurrently.
+The S3 bucket should have proper security measures in place to prevent unauthorized access.
+The Lambda function should have the necessary permissions to access the S3 bucket and execute Amazon Textract.
+Error handling should be implemented to handle any issues that may arise during the file upload, text extraction, or JSON response processes.
+
+
+Expectation:
+
+FE → upload pdf → uploaded in s3
+Textract run → figure all key value pairs in table form
+Return all keys & values to FE
+FE displays it as table
+-----------------------------------------------------------------------------------------------------------------------------------------------
+1. Browser to S3
+a. Create a S3 bucket with default settings
+b. Federated Identity Pool -> New Pool with access for UnAuth User (eu-north-1:94fe31e9-ef54-4eb4-a365-d2f189b5f8d7)
+c. IAM console -> role -> check for <FederatedPool_Unauth> and add the following as Policy
+{
+     "Version": "2012-10-17",
+   "Statement": [
+      {
+         "Effect": "Allow",
+         "Action": [
+            "s3:*"
+         ],
+         "Resource": [
+            "arn:aws:s3:::BUCKET_NAME/*"
+         ]
+      }
+   ]
+}
+d. Create a IAM user with this policy and TextractFullAccess + LambdaExecute
+e. In S3 bucket, configure following CORS
+[
+    {
+        "AllowedHeaders": [
+            "*"
+        ],
+        "AllowedMethods": [
+            "PUT",
+            "GET",
+            "POST",
+            "DELETE",
+            "HEAD"
+        ],
+        "AllowedOrigins": [
+            "*"
+        ],
+        "ExposeHeaders": [],
+        "MaxAgeSeconds": 3000
+    }
+]
+
+{
+  "Id": "Policy1675075527135",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Stmt1675075525603",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectAcl",
+        "s3:PutObject",
+        "s3:PutObjectAcl"
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:s3:::finalblood/*",
+      "Principal": "*"
+    }
+  ]
+}
+
+f. and following HTML code
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+<!doctype html>
+<head>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.357.0.min.js"></script>
+<script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+<script type="text/javascript">
+
+//Bucket Configurations
+
+var bucketName = "Name";
+var bucketRegion = "Region";
+var IdentityPoolId = "PoolId";
+
+ AWS.config.update({
+                region: bucketRegion,
+                credentials: new AWS.CognitoIdentityCredentials({
+                IdentityPoolId: IdentityPoolId
+                })
+            });
+
+            var s3 = new AWS.S3({
+                params: {Bucket: bucketName}
+        });
+</script>
+</head>
+<body>
+    <!-- A functional html code-->
+    <div>
+        <input type="file" id="fileUpload">
+    </div>
+
+    <div>
+    <button onclick="s3upload()">Submit</button>
+    </div>
+
+    <progress max=”100” value=”0”></progress>
+
+    <script type="text/javascript">
+
+      function s3upload() {  
+                var files = document.getElementById('fileUpload').files;
+                if (files) 
+                {
+                    var file = files[0];
+                    var date = new Date();
+                    var fileName = file.name;
+                    var filePath = fileName;
+                    var fileUrl = "https://" + bucketRegion + ".amazonaws.com/my-first-bucket/" +  filePath;
+            
+                    s3.upload({
+                                    Key: filePath,
+                                    Body: file,
+                                    ACL: 'public-read'
+                                },function(err, data) {
+                                    if(err) {
+                                        console.log("Error uploading file: ", err);
+                                        alert("Error uploading file. Please check the browser's console for more information.");
+                                    }else {
+                                        alert('Successfully Uploaded!');
+                                    }}).on('httpUploadProgress', function (progress) {
+                                        var uploaded = parseInt((progress.loaded * 100) / progress.total);
+                                        $("progress").attr('value', uploaded);
+                                    });
+                                }
+                            };
+        </script>
+    </body>
+</html>
+
+g. Check for ACLs and permissions
+
+2. connect lambda and s3 trigger with lambda parser codes
